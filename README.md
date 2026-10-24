@@ -2,7 +2,6 @@
 
 > **Architecture:** Single Page Application (SPA) Shell + RESTful Core PHP API  
 > **Tech Stack:** HTML5, Modern Tailwind CSS (Dark/Light Theming), Vanilla ES6+ JavaScript, Core PHP 8.2 (PDO), MySQL (InnoDB)  
-> **Location:** `http://localhost/DMS/` (Directory: `c:\wamp64\www\DMS`)  
 
 ---
 
