@@ -366,7 +366,7 @@ const App = {
             <!-- User Status Chip -->
             <div class="flex items-center gap-2 pl-2 border-l border-custom">
               <div class="text-right hidden sm:block">
-                <div class="text-xs font-bold text-main leading-tight">${user.display_name}</div>
+                <div class="text-xs font-bold text-main leading-tight">${user.display_name || user.name || 'Admin User'}</div>
                 <div class="text-[10px] text-primary font-semibold uppercase">${user.role_name}</div>
               </div>
               <button id="user-logout-btn" class="btn btn-secondary btn-sm p-1.5" title="Sign Out">

@@ -34,10 +34,16 @@ App\Core\Session::start();
   <link rel="stylesheet" href="assets/css/tailwind.css">
   <link rel="stylesheet" href="assets/css/print.css" media="print">
 
-  <!-- Tailwind CSS Engine (Local Standalone) -->
+  <!-- Tailwind CSS Engine (Local Standalone with Remote CDN Fallback) -->
   <script src="assets/js/tailwind.cdn.js"></script>
   <script>
-    tailwind.config = {
+    if (typeof window.tailwind === 'undefined') {
+      document.write('<script src="https://cdn.tailwindcss.com"><\/script>');
+    }
+  </script>
+  <script>
+    window.tailwind = window.tailwind || {};
+    window.tailwind.config = {
       darkMode: 'class',
       theme: {
         extend: {
