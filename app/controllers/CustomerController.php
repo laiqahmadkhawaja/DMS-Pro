@@ -153,8 +153,11 @@ class CustomerController {
                 'shop_name' => $customer['shop_name'],
                 'owner_name' => $customer['owner_name'],
                 'phone' => $customer['phone'],
+                'address' => $customer['address'] ?? '',
+                'territory_route' => $customer['territory_route'] ?? '',
                 'current_balance' => (float)($customer['current_balance_paisa'] / 100),
                 'credit_limit' => (float)($customer['credit_limit_paisa'] / 100),
+                'available_credit' => max(0, (float)($customer['credit_limit_paisa'] - $customer['current_balance_paisa']) / 100),
             ],
             'entries'  => $entries
         ]);

@@ -50,4 +50,17 @@ class SettingController {
 
         Response::json(null, 200, 'Company settings saved successfully.');
     }
+
+    public function companyInfo(Request $request): void {
+        Auth::require();
+        $db = Database::getConnection();
+        $settings = $db->query("SELECT setting_key, setting_value FROM company_settings")->fetchAll(PDO::FETCH_KEY_PAIR);
+        Response::json([
+            'tax_rate'     => isset($settings['tax_rate']) ? (float)$settings['tax_rate'] : 5.0,
+            'currency'     => $settings['currency'] ?? 'PKR',
+            'company_name' => $settings['company_name'] ?? 'DMS Logistics',
+            'phone'        => $settings['phone'] ?? '',
+            'address'      => $settings['address'] ?? ''
+        ]);
+    }
 }

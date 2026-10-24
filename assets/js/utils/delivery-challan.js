@@ -339,11 +339,11 @@ export const DeliveryChallan = {
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
               <span style="color: #64748b;">COD Collected:</span>
-              <strong style="color: #16a34a;">Rs. ${order.status === 'delivered' ? order.total.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}</strong>
+              <strong style="color: #16a34a;">Rs. ${(Number(order.cod_collected ?? order.paid_amount ?? (order.payment_terms === 'cash' && order.status === 'delivered' ? order.total : 0))).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong>
             </div>
             <div style="display: flex; justify-content: space-between; padding-top: 4px; border-top: 1px solid #cbd5e1; font-weight: 800;">
               <span>Receivable Balance:</span>
-              <span style="color: #2563eb;">Rs. ${order.status === 'delivered' ? '0.00' : order.total.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+              <span style="color: #2563eb;">Rs. ${(Math.max(0, (order.total || 0) - Number(order.cod_collected ?? order.paid_amount ?? (order.payment_terms === 'cash' && order.status === 'delivered' ? order.total : 0)))).toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
         </div>
@@ -481,11 +481,11 @@ export const DeliveryChallan = {
           </div>
           <div style="display: flex; justify-content: space-between; font-weight: 700;">
             <span>COD Collected:</span>
-            <span>Rs. ${order.status === 'delivered' ? order.total.toFixed(0) : '0'}</span>
+            <span>Rs. ${(Number(order.cod_collected ?? order.paid_amount ?? (order.payment_terms === 'cash' && order.status === 'delivered' ? order.total : 0))).toFixed(0)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 11pt;">
             <span>Balance Due:</span>
-            <span>Rs. ${order.status === 'delivered' ? '0' : order.total.toFixed(0)}</span>
+            <span>Rs. ${(Math.max(0, (order.total || 0) - Number(order.cod_collected ?? order.paid_amount ?? (order.payment_terms === 'cash' && order.status === 'delivered' ? order.total : 0)))).toFixed(0)}</span>
           </div>
         </div>
 

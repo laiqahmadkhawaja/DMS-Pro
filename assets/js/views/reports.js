@@ -520,8 +520,22 @@ export const ReportsView = {
       .map(c => {
         const bal = c.current_balance || 0;
         const limit = c.credit_limit || 0;
-        const regDate = new Date(c.created_at || now);
-        const diffDays = Math.max(0, Math.floor((now - regDate) / (1000 * 60 * 60 * 24)));
+
+        // Find oldest unpaid invoice/order date for accurate debt aging
+        const unpaidOrders = (this.raw.orders || []).filter(o =>
+          (o.customer_id === c.id || o.customer_code === c.code) &&
+          (o.balance_due_paisa > 0 || (o.payment_status !== 'paid' && !['cancelled', 'undelivered', 'delivery_failed'].includes(o.status)))
+        );
+
+        let oldestDate = null;
+        if (unpaidOrders.length > 0) {
+          unpaidOrders.sort((a, b) => new Date(a.invoice_date || a.created_at) - new Date(b.invoice_date || b.created_at));
+          oldestDate = new Date(unpaidOrders[0].invoice_date || unpaidOrders[0].created_at);
+        } else {
+          oldestDate = new Date(c.created_at || now);
+        }
+
+        const diffDays = Math.max(0, Math.floor((now - oldestDate) / (1000 * 60 * 60 * 24)));
 
         let bracket = '0 - 15d';
         let badgeClass = 'badge-success';

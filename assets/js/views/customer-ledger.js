@@ -184,9 +184,9 @@ export const CustomerLedgerView = {
             <div style="color: #64748b;">Address: ${c.address || '-'} &bull; Route: ${c.territory_route || 'Standard'}</div>
           </div>
           <div style="text-align: right;">
-            <div>Credit Limit: <strong>Rs. ${c.credit_limit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></div>
-            <div style="font-size: 13px; font-weight: bold; color: #b91c1c; margin-top: 2px;">Outstanding Balance: Rs. ${c.current_balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-            <div style="color: #15803d; font-size: 10px;">Available Credit: Rs. ${c.available_credit.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            <div>Credit Limit: <strong>Rs. ${(c.credit_limit || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</strong></div>
+            <div style="font-size: 13px; font-weight: bold; color: #b91c1c; margin-top: 2px;">Outstanding Balance: Rs. ${(c.current_balance || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+            <div style="color: #15803d; font-size: 10px;">Available Credit: Rs. ${(c.available_credit ?? Math.max(0, (c.credit_limit || 0) - (c.current_balance || 0))).toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
           </div>
         </div>
 

@@ -16,6 +16,7 @@ export const OrderCreateView = {
   activeCategory: 'All',
   searchQuery: '',
   discountAmount: 0,
+  taxRate: 5.0,
   bookerCanvas: null,
   bookerCtx: null,
   isDrawing: false,
@@ -95,7 +96,7 @@ export const OrderCreateView = {
                 <span class="font-semibold text-main" id="cart-subtotal-text">Rs. 0.00</span>
               </div>
               <div class="flex justify-between text-muted-custom">
-                <span>GST Tax (5%):</span>
+                <span id="cart-tax-label">GST Tax (${this.taxRate}%):</span>
                 <span class="font-semibold text-main" id="cart-tax-text">Rs. 0.00</span>
               </div>
               <div class="flex items-center justify-between gap-2">
@@ -158,17 +159,22 @@ export const OrderCreateView = {
 
   async loadInitialData() {
     try {
-      const [prodRes, custRes] = await Promise.all([
+      const [prodRes, custRes, settingsRes] = await Promise.all([
         Api.get('/products?active_only=1'),
-        Api.get('/customers?active_only=1')
+        Api.get('/customers?active_only=1'),
+        Api.get('/settings/company').catch(() => null)
       ]);
 
       this.products = prodRes.data || [];
       this.customers = custRes.data || [];
+      if (settingsRes && settingsRes.data && settingsRes.data.tax_rate !== undefined) {
+        this.taxRate = parseFloat(settingsRes.data.tax_rate) || 5.0;
+      }
 
       this.populateCustomersSelect();
       this.populateCategoryPills();
       this.renderProducts();
+      this.updateCartCalculations();
     } catch (e) {
       Toast.error('Failed to load catalog or customers: ' + e.message);
     }
@@ -457,14 +463,16 @@ export const OrderCreateView = {
       if (p) subtotal += p.selling_price * qty;
     }
 
-    const tax = Math.round(subtotal * 0.05 * 100) / 100;
+    const tax = Math.round(subtotal * (this.taxRate / 100) * 100) / 100;
     const grandTotal = Math.max(0, subtotal + tax - this.discountAmount);
 
     const subtotalEl = document.getElementById('cart-subtotal-text');
+    const taxLabelEl = document.getElementById('cart-tax-label');
     const taxEl = document.getElementById('cart-tax-text');
     const grandTotalEl = document.getElementById('cart-grand-total');
     const submitBtn = document.getElementById('submit-order-btn');
 
+    if (taxLabelEl) taxLabelEl.textContent = `GST Tax (${this.taxRate}%):`;
     if (subtotalEl) subtotalEl.textContent = `Rs. ${subtotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (taxEl) taxEl.textContent = `Rs. ${tax.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;
     if (grandTotalEl) grandTotalEl.textContent = `Rs. ${grandTotal.toLocaleString('en-US', { minimumFractionDigits: 2 })}`;

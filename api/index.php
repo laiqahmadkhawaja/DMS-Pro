@@ -126,6 +126,7 @@ $router->get('/api/reports/sales', [ReportController::class, 'sales']);
 $router->get('/api/reports/suite', [ReportController::class, 'suite']);
 
 // --- Settings ---
+$router->get('/api/settings/company', [SettingController::class, 'companyInfo']);
 $router->get('/api/settings', [SettingController::class, 'index']);
 $router->post('/api/settings', [SettingController::class, 'update']);
 

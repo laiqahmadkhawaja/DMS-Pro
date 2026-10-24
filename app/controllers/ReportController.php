@@ -18,9 +18,9 @@ class ReportController {
         $db = Database::getConnection();
 
         // 1. KPI Summaries
-        $salesToday = $db->query("SELECT COALESCE(SUM(total_paisa), 0) FROM orders WHERE DATE(created_at) = CURRENT_DATE AND status != 'cancelled'")->fetchColumn();
-        $salesMonth = $db->query("SELECT COALESCE(SUM(total_paisa), 0) FROM orders WHERE MONTH(created_at) = MONTH(CURRENT_DATE) AND YEAR(created_at) = YEAR(CURRENT_DATE) AND status != 'cancelled'")->fetchColumn();
-        $ordersCount = $db->query("SELECT COUNT(*) FROM orders WHERE status != 'cancelled'")->fetchColumn();
+        $salesToday = $db->query("SELECT COALESCE(SUM(total_paisa), 0) FROM orders WHERE DATE(created_at) = CURRENT_DATE AND status NOT IN ('cancelled', 'undelivered', 'delivery_failed')")->fetchColumn();
+        $salesMonth = $db->query("SELECT COALESCE(SUM(total_paisa), 0) FROM orders WHERE MONTH(created_at) = MONTH(CURRENT_DATE) AND YEAR(created_at) = YEAR(CURRENT_DATE) AND status NOT IN ('cancelled', 'undelivered', 'delivery_failed')")->fetchColumn();
+        $ordersCount = $db->query("SELECT COUNT(*) FROM orders WHERE status NOT IN ('cancelled', 'undelivered', 'delivery_failed')")->fetchColumn();
         $pendingDispatches = $db->query("SELECT COUNT(*) FROM orders WHERE status IN ('submitted', 'approved')")->fetchColumn();
         $receivables = $db->query("SELECT COALESCE(SUM(current_balance_paisa), 0) FROM customers")->fetchColumn();
         $lowStock = $db->query("SELECT COUNT(*) FROM products WHERE current_stock <= min_stock_level AND active = 1")->fetchColumn();
@@ -54,7 +54,7 @@ class ReportController {
                    COUNT(*) as order_count, 
                    COALESCE(SUM(total_paisa), 0) as total_paisa
             FROM orders
-            WHERE created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY) AND status != 'cancelled'
+            WHERE created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 6 DAY) AND status NOT IN ('cancelled', 'undelivered', 'delivery_failed')
             GROUP BY DATE(created_at)
             ORDER BY order_date ASC
         ")->fetchAll();
@@ -86,7 +86,7 @@ class ReportController {
             FROM order_items oi
             JOIN products p ON oi.product_id = p.id
             JOIN orders o ON oi.order_id = o.id
-            WHERE o.status != 'cancelled'
+            WHERE o.status NOT IN ('cancelled', 'undelivered', 'delivery_failed')
             GROUP BY p.category
             ORDER BY total_sales_paisa DESC
         ")->fetchAll();
@@ -136,7 +136,7 @@ class ReportController {
             SELECT o.id, o.order_number, o.created_at, o.customer_name, o.route, o.status,
                    o.order_taker_name, o.subtotal_paisa, o.tax_paisa, o.discount_paisa, o.total_paisa
             FROM orders o
-            WHERE DATE(o.created_at) BETWEEN ? AND ? AND o.status != 'cancelled'
+            WHERE DATE(o.created_at) BETWEEN ? AND ? AND o.status NOT IN ('cancelled', 'undelivered', 'delivery_failed')
             ORDER BY o.created_at DESC
         ");
         $stmt->execute([$from, $to]);
@@ -165,7 +165,7 @@ class ReportController {
             SELECT o.id, o.order_number, o.customer_id, o.customer_name, o.customer_code,
                    o.route, o.status, o.payment_terms, o.subtotal_paisa, o.tax_paisa, o.discount_paisa,
                    o.total_paisa, o.created_at, o.order_taker_name,
-                   si.invoice_number, si.payment_status, si.balance_due_paisa
+                   si.invoice_number, si.payment_status, si.balance_due_paisa, si.due_date, si.created_at as invoice_date
             FROM orders o
             LEFT JOIN sales_invoices si ON si.order_id = o.id
             ORDER BY o.created_at DESC

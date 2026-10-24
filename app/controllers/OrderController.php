@@ -393,9 +393,18 @@ class OrderController {
                 }
 
                 // If delivered_items provided, update order_items delivered_quantity and restore unaccepted stock
-                if (!empty($deliveredItems) && is_array($deliveredItems)) {
+                $effectiveSubtotalPaisa = 0;
+                $hasDeliveredItems = (!empty($deliveredItems) && is_array($deliveredItems));
+                if ($hasDeliveredItems) {
                     $updDeliv = $db->prepare("UPDATE order_items SET delivered_quantity = ? WHERE order_id = ? AND product_id = ?");
                     $updRestoreStock = $db->prepare("UPDATE products SET current_stock = current_stock + ? WHERE id = ?");
+                    
+                    $existingItems = $db->query("SELECT product_id, product_name, quantity, unit_price_paisa FROM order_items WHERE order_id = '{$order['id']}'")->fetchAll(\PDO::FETCH_ASSOC);
+                    $itemPriceMap = [];
+                    foreach ($existingItems as $ei) {
+                        $itemPriceMap[$ei['product_id']] = (int)$ei['unit_price_paisa'];
+                    }
+
                     foreach ($deliveredItems as $dit) {
                         $pId = $dit['product_id'] ?? $dit['productId'] ?? '';
                         $delQty = isset($dit['delivered_quantity']) ? (int)$dit['delivered_quantity'] : (int)($dit['deliveredQuantity'] ?? 0);
@@ -406,27 +415,55 @@ class OrderController {
                             if ($ordQty > $delQty) {
                                 $returnedQty = $ordQty - $delQty;
                                 $updRestoreStock->execute([$returnedQty, $pId]);
+
+                                // Record stock movement
+                                $movId = 'MOV-' . uniqid();
+                                $curStock = (int)$db->query("SELECT current_stock FROM products WHERE id = '{$pId}'")->fetchColumn();
+                                $db->prepare("
+                                    INSERT INTO stock_movements (id, movement_id, product_id, product_name, movement_type, quantity_change, previous_stock, new_stock, reference_id, recorded_by)
+                                    SELECT ?, ?, p.id, p.name, 'DISPATCH_RETURN', ?, ?, ?, ?, ?
+                                    FROM products p WHERE p.id = ?
+                                ")->execute([$movId, $movId, $returnedQty, $curStock - $returnedQty, $curStock, $order['order_number'], $user['display_name'], $pId]);
                             }
+                            $unitPricePaisa = $itemPriceMap[$pId] ?? 0;
+                            $effectiveSubtotalPaisa += ($delQty * $unitPricePaisa);
                         }
                     }
+                }
+
+                $effectiveTotalPaisa = (int)$order['total_paisa'];
+                if ($hasDeliveredItems && $effectiveSubtotalPaisa > 0 && $effectiveSubtotalPaisa < (int)$order['subtotal_paisa']) {
+                    $taxRate = 5.0;
+                    $taxStmt = $db->query("SELECT setting_value FROM company_settings WHERE setting_key = 'tax_rate'");
+                    if ($row = $taxStmt->fetch()) {
+                        $taxRate = (float)$row['setting_value'];
+                    }
+                    $ratio = $effectiveSubtotalPaisa / (int)$order['subtotal_paisa'];
+                    $effectiveDiscountPaisa = (int)round((int)$order['discount_paisa'] * $ratio);
+                    $effectiveTaxPaisa = (int)round(($effectiveSubtotalPaisa * $taxRate) / 100);
+                    $effectiveTotalPaisa = max(0, $effectiveSubtotalPaisa + $effectiveTaxPaisa - $effectiveDiscountPaisa);
+
+                    // Update order totals to match delivered reality
+                    $db->prepare("UPDATE orders SET subtotal_paisa = ?, tax_paisa = ?, discount_paisa = ?, total_paisa = ? WHERE id = ?")
+                       ->execute([$effectiveSubtotalPaisa, $effectiveTaxPaisa, $effectiveDiscountPaisa, $effectiveTotalPaisa, $order['id']]);
                 }
 
                 // Automatically generate Invoice & update Customer Ledger + Balance
                 $invId = 'INV-' . substr($order['order_number'], 4);
                 $codPaisa = (int)round($codCollected * 100);
-                $paidPaisa = min($order['total_paisa'], $codPaisa);
-                $balDuePaisa = max(0, $order['total_paisa'] - $paidPaisa);
+                $paidPaisa = min($effectiveTotalPaisa, $codPaisa);
+                $balDuePaisa = max(0, $effectiveTotalPaisa - $paidPaisa);
                 $payStatus = $balDuePaisa === 0 ? 'paid' : ($paidPaisa > 0 ? 'partial' : 'unpaid');
 
                 $insInv = $db->prepare("
                     INSERT INTO sales_invoices (id, invoice_number, order_id, customer_id, customer_name, total_amount_paisa, paid_amount_paisa, balance_due_paisa, payment_status, due_date)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, DATE_ADD(CURRENT_DATE, INTERVAL 15 DAY))
-                    ON DUPLICATE KEY UPDATE balance_due_paisa = VALUES(balance_due_paisa)
+                    ON DUPLICATE KEY UPDATE total_amount_paisa = VALUES(total_amount_paisa), paid_amount_paisa = VALUES(paid_amount_paisa), balance_due_paisa = VALUES(balance_due_paisa), payment_status = VALUES(payment_status)
                 ");
-                $insInv->execute([$invId, $invId, $order['id'], $order['customer_id'], $order['customer_name'], $order['total_paisa'], $paidPaisa, $balDuePaisa, $payStatus]);
+                $insInv->execute([$invId, $invId, $order['id'], $order['customer_id'], $order['customer_name'], $effectiveTotalPaisa, $paidPaisa, $balDuePaisa, $payStatus]);
 
                 // Update customer balance: invoice adds debit, cash collected reduces it
-                $netBalanceChange = $order['total_paisa'] - $paidPaisa;
+                $netBalanceChange = $effectiveTotalPaisa - $paidPaisa;
                 if ($netBalanceChange > 0) {
                     $db->prepare("UPDATE customers SET current_balance_paisa = current_balance_paisa + ? WHERE id = ?")
                        ->execute([$netBalanceChange, $order['customer_id']]);
@@ -439,7 +476,7 @@ class OrderController {
                 $db->prepare("
                     INSERT INTO customer_ledger (customer_id, type, description, reference_id, debit_paisa, credit_paisa, balance_paisa, recorded_by)
                     VALUES (?, 'INVOICE', ?, ?, ?, 0, ?, ?)
-                ")->execute([$order['customer_id'], "Invoice {$invId} for delivered order {$order['order_number']}" . ($receivedByName ? " (Received by: {$receivedByName})" : ''), $invId, $order['total_paisa'], $newBal, $user['display_name']]);
+                ")->execute([$order['customer_id'], "Invoice {$invId} for delivered order {$order['order_number']}" . ($receivedByName ? " (Received by: {$receivedByName})" : ''), $invId, $effectiveTotalPaisa, $newBal, $user['display_name']]);
 
                 // If COD cash was collected on spot, log payment and payment allocation
                 if ($paidPaisa > 0) {
@@ -471,10 +508,24 @@ class OrderController {
                     $updFields[] = 'undelivered_reason = ?';
                     $updValues[] = $undeliveredReason;
                 }
-                // Restore reserved stock back to products
-                $items = $db->query("SELECT product_id, quantity FROM order_items WHERE order_id = '{$order['id']}'")->fetchAll();
-                foreach ($items as $it) {
-                    $db->prepare("UPDATE products SET current_stock = current_stock + ? WHERE id = ?")->execute([$it['quantity'], $it['product_id']]);
+                // Only restore stock if not already cancelled/undelivered/delivery_failed to prevent double restoration!
+                $prevStatus = $order['status'];
+                if (!in_array($prevStatus, ['cancelled', 'undelivered', 'delivery_failed'])) {
+                    $items = $db->query("SELECT product_id, quantity FROM order_items WHERE order_id = '{$order['id']}'")->fetchAll();
+                    foreach ($items as $it) {
+                        $pId = $it['product_id'];
+                        $qty = (int)$it['quantity'];
+                        $db->prepare("UPDATE products SET current_stock = current_stock + ? WHERE id = ?")->execute([$qty, $pId]);
+
+                        // Record stock movement
+                        $movId = 'MOV-' . uniqid();
+                        $curStock = (int)$db->query("SELECT current_stock FROM products WHERE id = '{$pId}'")->fetchColumn();
+                        $db->prepare("
+                            INSERT INTO stock_movements (id, movement_id, product_id, product_name, movement_type, quantity_change, previous_stock, new_stock, reference_id, recorded_by)
+                            SELECT ?, ?, p.id, p.name, 'DISPATCH_RETURN', ?, ?, ?, ?, ?
+                            FROM products p WHERE p.id = ?
+                        ")->execute([$movId, $movId, $qty, $curStock - $qty, $curStock, $order['order_number'], $user['display_name'], $pId]);
+                    }
                 }
             }
 

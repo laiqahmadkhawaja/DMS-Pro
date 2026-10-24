@@ -116,7 +116,7 @@ class RecoveryController {
                 UPDATE sales_invoices 
                 SET paid_amount_paisa = paid_amount_paisa + ?, 
                     balance_due_paisa = balance_due_paisa - ?,
-                    payment_status = CASE WHEN (balance_due_paisa - ?) <= 0 THEN 'paid' ELSE 'partial' END
+                    payment_status = ?
                 WHERE id = ?
             ");
 
@@ -124,14 +124,15 @@ class RecoveryController {
                 if ($remainingToAllocate <= 0) break;
 
                 $alloc = min($remainingToAllocate, (int)$inv['balance_due_paisa']);
+                $newStatus = ($alloc >= (int)$inv['balance_due_paisa']) ? 'paid' : 'partial';
                 $insAlloc->execute([$paymentId, $inv['id'], $inv['invoice_number'], $alloc]);
-                $updInv->execute([$alloc, $alloc, $alloc, $inv['id']]);
+                $updInv->execute([$alloc, $alloc, $newStatus, $inv['id']]);
 
                 $remainingToAllocate -= $alloc;
             }
 
-            // 3. Update customer outstanding balance
-            $db->prepare("UPDATE customers SET current_balance_paisa = GREATEST(0, current_balance_paisa - ?) WHERE id = ?")
+            // 3. Update customer outstanding balance (Negative balance represents advance / customer credit)
+            $db->prepare("UPDATE customers SET current_balance_paisa = current_balance_paisa - ? WHERE id = ?")
                ->execute([$amountPaisa, $customer['id']]);
 
             // 4. Create customer ledger entry
