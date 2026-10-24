@@ -1,0 +1,90 @@
+/**
+ * Print Stylesheet for DMS Invoices, Delivery Challans, and Statements
+ */
+
+@media print {
+  /* Complete hiding of application shell and layout chrome */
+  nav, header, aside, sidebar, #desktop-sidebar-nav, .mobile-bottom-nav,
+  .no-print, button, #toast-container, .btn, .modal-footer, .sticky-actions-bar,
+  #app-root > div > header, #app-root > div > div > aside, .sig-canvas-box, #btn-clear-sig {
+    display: none !important;
+  }
+
+  /* Reset layout constraints for natural print flow */
+  html, body, #app-root, #app-view {
+    background: #ffffff !important;
+    color: #000000 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body {
+    font-size: 10pt !important;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif !important;
+  }
+
+  /* Remove dark mode and shadow artifacts */
+  .dark {
+    color-scheme: light !important;
+  }
+
+  .card, .card-hover {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .print-invoice-box {
+    border: 1px solid #333333;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  th, td {
+    border: 1px solid #444444 !important;
+    padding: 6px 10px !important;
+    font-size: 10pt !important;
+  }
+
+  th {
+    background-color: #f0f0f0 !important;
+    font-weight: bold !important;
+  }
+
+  .text-right {
+    text-align: right !important;
+  }
+
+  .print-signatures {
+    margin-top: 40px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .signature-line {
+    border-top: 1px dashed #333333;
+    width: 200px;
+    text-align: center;
+    padding-top: 5px;
+    font-size: 9pt;
+  }
+}

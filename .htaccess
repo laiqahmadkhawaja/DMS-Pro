@@ -1,0 +1,26 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Pass Authorization header into PHP
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Gracefully handle any /DMS/ prefix on root-hosted domains
+    RewriteRule ^DMS/(.*)$ $1 [QSA,L]
+
+    # Direct all API requests through api/index.php
+    RewriteCond %{REQUEST_URI} ^/api/index\.php [NC]
+    RewriteRule .* - [L]
+
+    RewriteRule ^api(/.*)?$ api/index.php [QSA,L]
+</IfModule>
+
+# Prevent directory browsing
+Options -Indexes
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+</IfModule>
